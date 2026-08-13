@@ -53,13 +53,18 @@ class Admin(commands.Cog):
             await interaction.response.send_message("That player isn't part of this match.", ephemeral=True)
             return
 
+        # finish_match_and_cleanup waits a few seconds before deleting the
+        # thread, which blows past Discord's 3-second initial-response
+        # window -- defer now and reply via followup once it's done.
+        await interaction.response.defer()
+
         side = "p1" if str(winner.id) == challenge.challenger_id else "p2"
         winner_member, loser_member, role_swap_error = await services.finalize_match(interaction.guild, challenge, side)
         if role_swap_error:
             await interaction.channel.send(f"⚠️ {role_swap_error}")
         challenge = await challenges_db.get_challenge(challenge_id)
         await services.finish_match_and_cleanup(interaction.guild, challenge, winner_member, loser_member)
-        await interaction.response.send_message("Result recorded.")
+        await interaction.followup.send("Result recorded.")
 
     @app_commands.command(name="settier", description="[Supervisor] Manually set a player's tier role.")
     @app_commands.describe(member="The player to update.", tier="The tier to assign.")
@@ -81,10 +86,15 @@ class Admin(commands.Cog):
         if not challenge:
             await interaction.response.send_message("No such challenge.", ephemeral=True)
             return
+        # cancel_match_and_cleanup waits a few seconds before deleting the
+        # thread, which blows past Discord's 3-second initial-response
+        # window -- defer now and reply via followup once it's done.
+        await interaction.response.defer()
+
         await challenges_db.update_status(challenge_id, "cancelled")
         challenge = await challenges_db.get_challenge(challenge_id)
         await services.cancel_match_and_cleanup(interaction.guild, challenge)
-        await interaction.response.send_message(f"Challenge #{challenge_id} cancelled.")
+        await interaction.followup.send(f"Challenge #{challenge_id} cancelled.")
 
 
 async def setup(bot: commands.Bot):

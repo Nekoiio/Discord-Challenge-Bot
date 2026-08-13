@@ -305,14 +305,15 @@ async def finish_match_and_cleanup(
     challenge: challenges_db.Challenge,
     winner: discord.Member,
     loser: discord.Member,
+    view: discord.ui.View | None = None,
 ) -> None:
     """
     Common "the match just ended" wrap-up: refresh every card to show
-    Completed, post the final result somewhere permanent, then delete the
-    match thread.
+    Completed (disabling the score panel's buttons if a view is given),
+    post the final result somewhere permanent, then delete the match thread.
     """
     challenge = await challenges_db.get_challenge(challenge.id)
-    await refresh_all_cards(guild, challenge)
+    await refresh_all_cards(guild, challenge, view=view)
 
     origin_channel = guild.get_channel(int(challenge.channel_id))
     if origin_channel:
@@ -333,10 +334,12 @@ async def finish_match_and_cleanup(
             )
 
 
-async def cancel_match_and_cleanup(guild: discord.Guild, challenge: challenges_db.Challenge) -> None:
+async def cancel_match_and_cleanup(
+    guild: discord.Guild, challenge: challenges_db.Challenge, view: discord.ui.View | None = None
+) -> None:
     """Same wrap-up as finish_match_and_cleanup, but for a cancelled (not completed) match."""
     challenge = await challenges_db.get_challenge(challenge.id)
-    await refresh_all_cards(guild, challenge)
+    await refresh_all_cards(guild, challenge, view=view)
 
     if challenge.thread_id:
         thread = guild.get_channel_or_thread(int(challenge.thread_id))
