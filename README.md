@@ -2,7 +2,7 @@
 
 A Discord bot that runs a fully automated, tier-based ladder for competitive
 1v1 challenges — built for a community that wanted its ranking system to stop
-living in someone's head and start living in code.
+living in someone's head.
 
 Players hold a **tier role** (`t1` → `t500`), challenge the player
 above them, and the bot handles the rest: eligibility checks, the
