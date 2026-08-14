@@ -18,10 +18,10 @@ from config import CFG
 TIER_ORDER = ["t1", "t2", "t3", "t500"]
 
 TIER_LABELS = {
-    "t1": "Le t1",
-    "t2": "Le t2",
-    "t3": "Le t3",
-    "t500": "Le t500",
+    "t1": "T1",
+    "t2": "T2",
+    "t3": "T3",
+    "t500": "T500",
 }
 
 TIER_LIMITS = {

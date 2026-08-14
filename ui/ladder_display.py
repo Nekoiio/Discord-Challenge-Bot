@@ -34,7 +34,7 @@ async def build_ladder_markdown(guild: discord.Guild) -> str:
         if ordered:
             for member, rank in ordered:
                 jersey = await players_db.get_jersey_number(member.id)
-                jersey_str = f" — Jersey #{jersey}" if jersey is not None else ""
+                jersey_str = f" — #{jersey}" if jersey is not None else ""
                 lines.append(f"{rank}. {member.mention}{jersey_str}")
         else:
             lines.append("*empty*")
