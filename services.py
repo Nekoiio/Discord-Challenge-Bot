@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import discord
 
 import database.challenges as challenges_db
+import database.ladder_display as ladder_display_db
 import database.players as players_db
 from config import CFG
 from ui.embeds import (
@@ -22,6 +23,7 @@ from ui.embeds import (
     supervisor_notify_embed,
     tracker_embed,
 )
+from ui.ladder_display import build_ladder_markdown
 from utils.ladder_logic import (
     compute_cooldown_expiry,
     game_winner,
@@ -207,6 +209,43 @@ async def refresh_all_cards(guild: discord.Guild, challenge: challenges_db.Chall
     await refresh_match_panel(guild, challenge, view)
 
 
+async def sync_ladder_display(guild: discord.Guild) -> None:
+    """
+    Keeps the auto-updating #ladder message in sync with current tier role
+    membership. Checks whether the message we're tracking still actually
+    exists in the configured channel -- if not (first run, or it got
+    deleted), sends a fresh one and remembers its ID; if it does, just edits
+    it in place.
+    """
+    channel_id = CFG.ladder_display_channel_id
+    if not channel_id:
+        return
+    channel = guild.get_channel(channel_id)
+    if channel is None:
+        return
+
+    content = build_ladder_markdown(guild)
+    display = await ladder_display_db.get_display(str(guild.id))
+
+    message = None
+    if display and display.message_id:
+        try:
+            message = await channel.fetch_message(int(display.message_id))
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            message = None
+
+    if message is None:
+        message = await channel.send(content)
+        await ladder_display_db.set_display(str(guild.id), str(channel.id), str(message.id))
+        return
+
+    if message.content != content:
+        try:
+            await message.edit(content=content)
+        except discord.HTTPException:
+            pass
+
+
 async def apply_score_change(challenge_id: int, side: str, delta: int) -> challenges_db.Challenge:
     if delta > 0:
         return await challenges_db.add_point(challenge_id, side, amount=delta)
@@ -314,6 +353,7 @@ async def finish_match_and_cleanup(
     """
     challenge = await challenges_db.get_challenge(challenge.id)
     await refresh_all_cards(guild, challenge, view=view)
+    await sync_ladder_display(guild)
 
     origin_channel = guild.get_channel(int(challenge.channel_id))
     if origin_channel:

@@ -19,6 +19,7 @@ INITIAL_COGS = (
     "cogs.tickets",
     "cogs.admin",
     "tasks.background",
+    "tasks.ladder_display",
 )
 
 

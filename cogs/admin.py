@@ -74,6 +74,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message("Supervisors only.", ephemeral=True)
             return
         await set_member_tier(member, tier.value)
+        await services.sync_ladder_display(interaction.guild)
         await interaction.response.send_message(f"{member.mention} is now in **{TIER_LABELS[tier.value]}**.")
 
     @app_commands.command(name="cancelchallenge", description="[Supervisor] Cancel a pending or in-progress challenge.")

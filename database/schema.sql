@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS challenges (
     FOREIGN KEY (challenged_id) REFERENCES players(discord_id)
 );
 
+CREATE TABLE IF NOT EXISTS ladder_display (
+    guild_id    TEXT PRIMARY KEY,
+    channel_id  TEXT NOT NULL,
+    message_id  TEXT             -- NULL until the message has actually been sent once
+);
+
 CREATE TABLE IF NOT EXISTS tickets (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     guild_id    TEXT NOT NULL,

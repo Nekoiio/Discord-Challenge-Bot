@@ -31,6 +31,8 @@ class Config:
     supervisor_channel_id: int          # embeds notifying supervisors of new challenges
     tracker_channel_id: int             # read-only channel showing live challenge scores
     challenge_category_id: int          # category where match threads get created
+    ladder_display_channel_id: int      # channel where the auto-updating ladder message lives
+    ladder_update_interval_minutes: int  # how often the background loop refreshes it
 
     # Tiers are Discord roles, ordered highest -> lowest. "t500" is the pool
     # tier where anyone can challenge anyone else in it (like old "Tier 3").
@@ -53,6 +55,8 @@ def load_config() -> Config:
         supervisor_channel_id=_env_int("SUPERVISOR_CHANNEL_ID"),
         tracker_channel_id=_env_int("TRACKER_CHANNEL_ID"),
         challenge_category_id=_env_int("CHALLENGE_CATEGORY_ID"),
+        ladder_display_channel_id=_env_int("LADDER_DISPLAY_CHANNEL_ID"),
+        ladder_update_interval_minutes=_env_int("LADDER_UPDATE_INTERVAL_MINUTES", 10),
         tier_role_ids={
             "t1": _env_int("TIER1_ROLE_ID"),
             "t2": _env_int("TIER2_ROLE_ID"),
