@@ -24,6 +24,12 @@ TIER_LABELS = {
     "t500": "Le t500",
 }
 
+TIER_LIMITS = {
+    "t1": 2,
+    "t2": 4,
+    "t3": 5,
+    "t500": "NONE",  # Infinite limit for the pool tier
+}
 
 def get_member_tier(member: discord.Member) -> str | None:
     """Returns 't1'/'t2'/'t3'/'t500', or None if they hold none of those roles."""

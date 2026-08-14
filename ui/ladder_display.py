@@ -10,7 +10,7 @@ from __future__ import annotations
 import discord
 
 import database.players as players_db
-from utils.tiers import TIER_LABELS, TIER_ORDER, get_ordered_tier_members
+from utils.tiers import TIER_LABELS, TIER_ORDER,TIER_LIMITS, get_ordered_tier_members
 
 TIER_HEADER_EMOJI = {"t1": "🥇", "t2": "🥈", "t3": "🥉", "t500": "🔰"}
 
@@ -19,13 +19,18 @@ MAX_MESSAGE_LENGTH = 2000
 
 
 async def build_ladder_markdown(guild: discord.Guild) -> str:
-    lines = ["# 🏆 Ladder Rankings", ""]
+    lines = ["# LeComp Roster (In order)", ""]
 
     for tier in TIER_ORDER:
         if tier == "t500":
             continue  # t500 is the pool tier, not a ranked tier, so we don't show it here
         ordered = await get_ordered_tier_members(guild, tier)
-        lines.append(f"## {TIER_HEADER_EMOJI[tier]} {TIER_LABELS[tier]}")
+
+        if TIER_LIMITS[tier] == "NONE":
+            lines.append(f"## {TIER_LABELS[tier]} | {len(ordered)}/∞")
+        else:
+            lines.append(f"## {TIER_LABELS[tier]} | {len(ordered)}/{TIER_LIMITS[tier]}")
+
         if ordered:
             for member, rank in ordered:
                 jersey = await players_db.get_jersey_number(member.id)
