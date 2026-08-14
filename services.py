@@ -28,9 +28,9 @@ from utils.ladder_logic import (
     compute_cooldown_expiry,
     game_winner,
     match_winner,
-    tier_swap_result,
+    swap_tier_and_rank,
 )
-from utils.tiers import get_member_tier, set_member_tier
+from utils.tiers import ensure_tier_rank, get_member_tier, set_member_tier
 
 MATCH_THREADS_HUB_NAME = "match-threads"
 
@@ -212,10 +212,11 @@ async def refresh_all_cards(guild: discord.Guild, challenge: challenges_db.Chall
 async def sync_ladder_display(guild: discord.Guild) -> None:
     """
     Keeps the auto-updating #ladder message in sync with current tier role
-    membership. Checks whether the message we're tracking still actually
-    exists in the configured channel -- if not (first run, or it got
-    deleted), sends a fresh one and remembers its ID; if it does, just edits
-    it in place.
+    membership and intra-tier rank. Checks whether the message we're
+    tracking still actually exists in the configured channel -- if not
+    (first run, or it got deleted), sends a fresh one and remembers its ID;
+    if it does, just edits it in place. Mentions are included as plain
+    "@name"-style highlights but never actually ping anyone.
     """
     channel_id = CFG.ladder_display_channel_id
     if not channel_id:
@@ -224,7 +225,7 @@ async def sync_ladder_display(guild: discord.Guild) -> None:
     if channel is None:
         return
 
-    content = build_ladder_markdown(guild)
+    content = await build_ladder_markdown(guild)
     display = await ladder_display_db.get_display(str(guild.id))
 
     message = None
@@ -235,13 +236,13 @@ async def sync_ladder_display(guild: discord.Guild) -> None:
             message = None
 
     if message is None:
-        message = await channel.send(content)
+        message = await channel.send(content, allowed_mentions=discord.AllowedMentions.none())
         await ladder_display_db.set_display(str(guild.id), str(channel.id), str(message.id))
         return
 
     if message.content != content:
         try:
-            await message.edit(content=content)
+            await message.edit(content=content, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
             pass
 
@@ -308,19 +309,25 @@ async def finalize_match(
 
     role_swap_error: str | None = None
 
-    # Tiers only change hands when the lower-ranked challenger wins.
-    # (Within the t500 pool this is a same-tier no-op.)
+    # The winner takes the loser's exact spot -- tier AND rank within that
+    # tier. (When both players share a tier -- an intra-tier or t500 pool
+    # challenge -- the tier half is a no-op and only ranks swap.)
     if winner_id == challenge.challenger_id:
         challenger_tier = get_member_tier(challenger)
         challenged_tier = get_member_tier(challenged)
-        new_challenger_tier, new_challenged_tier = tier_swap_result(
-            challenger_tier, challenged_tier
+        challenger_rank = await ensure_tier_rank(guild, challenger, challenger_tier)
+        challenged_rank = await ensure_tier_rank(guild, challenged, challenged_tier)
+
+        (new_challenger_tier, new_challenger_rank), (new_challenged_tier, new_challenged_rank) = swap_tier_and_rank(
+            challenger_tier, challenger_rank, challenged_tier, challenged_rank
         )
         try:
             if new_challenger_tier != challenger_tier:
                 await set_member_tier(challenger, new_challenger_tier)
             if new_challenged_tier != challenged_tier:
                 await set_member_tier(challenged, new_challenged_tier)
+            await players_db.set_tier_rank(challenger.id, new_challenger_rank)
+            await players_db.set_tier_rank(challenged.id, new_challenged_rank)
         except discord.Forbidden:
             role_swap_error = (
                 "I couldn't update tier roles — I'm missing **Manage Roles**, or my "

@@ -1,8 +1,12 @@
--- Tier now lives entirely on Discord roles (Le t1/t2/t3/t500). This table
--- only tracks the challenge cooldown after a loss.
+-- Tier lives on Discord roles (Le t1/t2/t3/t500). This table tracks
+-- per-player state that Discord roles can't hold: the challenge cooldown
+-- after a loss, a player's rank *within* their current tier (1 = top of
+-- that tier), and their jersey number.
 CREATE TABLE IF NOT EXISTS players (
     discord_id      TEXT PRIMARY KEY,
-    cooldown_until  TEXT                   -- ISO datetime, NULL if not on cooldown
+    cooldown_until  TEXT,                  -- ISO datetime, NULL if not on cooldown
+    tier_rank       INTEGER,               -- rank within whatever tier they're currently in
+    jersey_number   INTEGER                -- optional, admin-set
 );
 
 CREATE TABLE IF NOT EXISTS challenges (

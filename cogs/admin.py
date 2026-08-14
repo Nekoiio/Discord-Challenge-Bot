@@ -5,9 +5,10 @@ from discord import app_commands
 from discord.ext import commands
 
 import database.challenges as challenges_db
+import database.players as players_db
 import services
-from utils.checks import is_supervisor
-from utils.tiers import TIER_LABELS, TIER_ORDER, set_member_tier
+from utils.checks import is_admin, is_supervisor
+from utils.tiers import TIER_LABELS, TIER_ORDER, get_member_tier, move_member_to_rank, set_member_tier
 
 
 class Admin(commands.Cog):
@@ -64,6 +65,7 @@ class Admin(commands.Cog):
             await interaction.channel.send(f"⚠️ {role_swap_error}")
         challenge = await challenges_db.get_challenge(challenge_id)
         await services.finish_match_and_cleanup(interaction.guild, challenge, winner_member, loser_member)
+        await services.sync_ladder_display(interaction.guild)
         await interaction.followup.send("Result recorded.")
 
     @app_commands.command(name="settier", description="[Supervisor] Manually set a player's tier role.")
@@ -74,8 +76,48 @@ class Admin(commands.Cog):
             await interaction.response.send_message("Supervisors only.", ephemeral=True)
             return
         await set_member_tier(member, tier.value)
+        # Re-fetch so we're reading their just-updated roles rather than a
+        # possibly-stale cached copy, then drop them to the bottom of the
+        # new tier's ranking (a very large target position gets clamped).
+        member = await interaction.guild.fetch_member(member.id)
+        new_position = await move_member_to_rank(interaction.guild, member, tier.value, new_position=10**9)
         await services.sync_ladder_display(interaction.guild)
-        await interaction.response.send_message(f"{member.mention} is now in **{TIER_LABELS[tier.value]}**.")
+        await interaction.response.send_message(
+            f"{member.mention} is now in **{TIER_LABELS[tier.value]}** at rank #{new_position}."
+        )
+
+    @app_commands.command(name="setrank", description="[Admin] Move a player to a specific rank within their current tier.")
+    @app_commands.describe(member="The player to move.", position="Target rank within their tier (1 = top).")
+    async def setrank(self, interaction: discord.Interaction, member: discord.Member, position: int):
+        if not is_admin(interaction.user):
+            await interaction.response.send_message("Admins only.", ephemeral=True)
+            return
+        tier = get_member_tier(member)
+        if tier is None:
+            await interaction.response.send_message(f"{member.mention} doesn't have a tier role.", ephemeral=True)
+            return
+        if position < 1:
+            await interaction.response.send_message("Position must be 1 or higher.", ephemeral=True)
+            return
+
+        actual_position = await move_member_to_rank(interaction.guild, member, tier, position)
+        await services.sync_ladder_display(interaction.guild)
+        await interaction.response.send_message(
+            f"{member.mention} is now rank **#{actual_position}** in **{TIER_LABELS[tier]}**."
+        )
+
+    @app_commands.command(name="setjersey", description="[Admin] Set (or clear) a player's jersey number.")
+    @app_commands.describe(member="The player to update.", number="Jersey number. Omit to clear it.")
+    async def setjersey(self, interaction: discord.Interaction, member: discord.Member, number: int | None = None):
+        if not is_admin(interaction.user):
+            await interaction.response.send_message("Admins only.", ephemeral=True)
+            return
+        await players_db.set_jersey_number(member.id, number)
+        await services.sync_ladder_display(interaction.guild)
+        if number is None:
+            await interaction.response.send_message(f"Cleared {member.mention}'s jersey number.")
+        else:
+            await interaction.response.send_message(f"{member.mention}'s jersey number is now **#{number}**.")
 
     @app_commands.command(name="cancelchallenge", description="[Supervisor] Cancel a pending or in-progress challenge.")
     @app_commands.describe(challenge_id="The challenge number to cancel.")

@@ -9,7 +9,7 @@ import database.players as players_db
 from ui.embeds import challenge_request_embed
 from ui.views import ChallengeResponseView
 from utils.ladder_logic import can_challenge
-from utils.tiers import get_member_tier
+from utils.tiers import ensure_tier_rank, get_member_tier
 
 
 class Challenges(commands.Cog):
@@ -51,9 +51,13 @@ class Challenges(commands.Cog):
             return
 
         cooldown_until = await players_db.get_cooldown(challenger.id)
+        challenger_rank = await ensure_tier_rank(interaction.guild, challenger, challenger_tier)
+        challenged_rank = await ensure_tier_rank(interaction.guild, opponent, challenged_tier)
         result = can_challenge(
             challenger_tier=challenger_tier,
             challenged_tier=challenged_tier,
+            challenger_tier_rank=challenger_rank,
+            challenged_tier_rank=challenged_rank,
             challenger_cooldown_until=cooldown_until,
         )
         if not result.allowed:

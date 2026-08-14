@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import discord
 
+import database.players as players_db
 from config import CFG
 from database.challenges import Challenge
-from utils.tiers import TIER_LABELS, TIER_ORDER, get_tier_members
+from utils.tiers import TIER_LABELS, TIER_ORDER, get_ordered_tier_members
 
 TIER_EMOJI = {"t1": "🥇", "t2": "🥈", "t3": "🥉", "t500": "🔰"}
 
@@ -25,12 +26,17 @@ def status_display(status: str) -> str:
     return STATUS_DISPLAY.get(status, status.replace("_", " ").title())
 
 
-def ladder_embed(guild: discord.Guild) -> discord.Embed:
+async def ladder_embed(guild: discord.Guild) -> discord.Embed:
     embed = discord.Embed(title="🏆 Ladder Rankings", color=discord.Color.gold())
     for tier in TIER_ORDER:
-        members = get_tier_members(guild, tier)
-        if members:
-            value = "\n".join(m.mention for m in members)
+        ordered = await get_ordered_tier_members(guild, tier)
+        if ordered:
+            lines = []
+            for member, rank in ordered:
+                jersey = await players_db.get_jersey_number(member.id)
+                jersey_str = f" • #{jersey}" if jersey is not None else ""
+                lines.append(f"**{rank}.** {member.mention}{jersey_str}")
+            value = "\n".join(lines)
         else:
             value = "*empty*"
         embed.add_field(
@@ -51,7 +57,8 @@ def challenge_request_embed(
         description=(
             f"{challenger.mention} ({TIER_LABELS[challenger_tier]}) is challenging "
             f"{challenged.mention} ({TIER_LABELS[challenged_tier]})!\n\n"
-            f"**{challenged.mention}**, do you accept?"
+            f"**{challenged.mention}**, do you accept? A best-of-3 to "
+            f"{CFG.points_to_win_game} awaits."
         ),
         color=discord.Color.orange(),
     )

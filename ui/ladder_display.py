@@ -1,13 +1,16 @@
 """
 Content for the auto-updating ladder message. Deliberately plain Discord
-markdown (# / ## headers, bullet lists) sent as regular message content --
-not an embed -- per request.
+markdown (# / ## headers, numbered lists) sent as regular message content --
+not an embed -- per request. Mentions use real <@id> syntax so they render
+as a proper highlighted "@name" that's clickable, but the actual ping is
+suppressed at send/edit time (see services.sync_ladder_display), not here.
 """
 from __future__ import annotations
 
 import discord
 
-from utils.tiers import TIER_LABELS, TIER_ORDER, get_tier_members
+import database.players as players_db
+from utils.tiers import TIER_LABELS, TIER_ORDER, get_ordered_tier_members
 
 TIER_HEADER_EMOJI = {"t1": "🥇", "t2": "🥈", "t3": "🥉", "t500": "🔰"}
 
@@ -15,14 +18,19 @@ TIER_HEADER_EMOJI = {"t1": "🥇", "t2": "🥈", "t3": "🥉", "t500": "🔰"}
 MAX_MESSAGE_LENGTH = 2000
 
 
-def build_ladder_markdown(guild: discord.Guild) -> str:
+async def build_ladder_markdown(guild: discord.Guild) -> str:
     lines = ["# 🏆 Ladder Rankings", ""]
 
     for tier in TIER_ORDER:
-        members = get_tier_members(guild, tier)
+        if tier == "t500":
+            continue  # t500 is the pool tier, not a ranked tier, so we don't show it here
+        ordered = await get_ordered_tier_members(guild, tier)
         lines.append(f"## {TIER_HEADER_EMOJI[tier]} {TIER_LABELS[tier]}")
-        if members:
-            lines.extend(f"- {m.mention}" for m in members)
+        if ordered:
+            for member, rank in ordered:
+                jersey = await players_db.get_jersey_number(member.id)
+                jersey_str = f" — Jersey #{jersey}" if jersey is not None else ""
+                lines.append(f"{rank}. {member.mention}{jersey_str}")
         else:
             lines.append("*empty*")
         lines.append("")
